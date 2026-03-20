@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium Portfolio v2.0</title>
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- GSAP for Animations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <!-- SortableJS for Drag & Drop -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <!-- Tailwind CSS (via CDN for styling utilities) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --accent-color: #6366f1;
+            --accent-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+            --text-primary: #ffffff;
+            --text-secondary: #94a3b8;
+        }
+
+        [data-theme="light"] {
+            --glass-bg: rgba(0, 0, 0, 0.02);
+            --glass-border: rgba(0, 0, 0, 0.08);
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+        }
+
+        * {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        body {
+            background: #0f172a;
+            color: var(--text-primary);
+            overflow-x: hidden;
+            transition: background 0.5s ease;
+        }
+
+        body.light-mode {
+            background: #f8fafc;
+        }
+
+        /* Glassmorphism Classes */
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .light-mode .glass-card {
+            background: rgba(0, 0, 0, 0.02);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        /* Loading Screen */
+        #loader {
+            position: fixed;
+            inset: 0;
+            background: #0f172a;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .loader-bar {
+            width: 200px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            margin-top: 20px;
+            overflow: hidden;
+        }
+
+        .loader-progress {
+            height: 100%;
+            width: 0%;
+            background: var(--accent-gradient);
+            transition: width 0.3s ease;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+
+        /* Smooth Drag Ghost */
+        .sortable-ghost { opacity: 0.3; transform: scale(0.95); }
+        .sortable-drag { cursor: grabbing; }
+
+        /* Animations */
+        .page { display: none; opacity: 0; transform: translateY(20px); }
+        .page.active { display: block; }
+
+        /* Tooltip & Modal Customization */
+        input, textarea {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            outline: none;
+            transition: all 0.3s;
+        }
+        .light-mode input, .light-mode textarea {
+            background: rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            color: #1e293b;
+        }
+        input:focus { border-color: var(--accent-color); }
+
+        .hidden-admin { display: none !important; }
+
+        /* Skeleton Loading */
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .skeleton {
+            background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+
+        /* Nav active */
+        .nav-item.active {
+            color: white;
+            background: var(--accent-gradient);
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+        }
+    </style>
+</head>
+<body class="dark-mode">
+
+    <!-- Sound Effects -->
+    <audio id="click-sound" src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" preload="auto"></audio>
+
+    <!-- Loader -->
+    <div id="loader">
+        <div class="text-4xl font-bold tracking-tighter text-white flex items-center gap-2">
+            <i data-lucide="layers" class="w-10 h-10 text-indigo-500"></i>
+            PORTFOLIO
+        </div>
+        <div class="loader-bar">
+            <div class="loader-progress" id="loader-progress"></div>
+        </div>
+    </div>
+
+    <!-- Background Elements -->
+    <div class="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/20 blur-[120px] rounded-full"></div>
+        <div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/20 blur-[120px] rounded-full"></div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="max-w-4xl mx-auto px-6 pt-10 pb-32 min-h-screen">
+        
+        <!-- Header / Profile Section -->
+        <header class="mb-12">
+            <div class="flex flex-col md:flex-row items-center gap-8 glass p-8">
+                <div class="relative group">
+                    <div id="profile-pic-container" class="w-32 h-32 rounded-3xl overflow-hidden border-4 border-indigo-500/20 relative shadow-2xl">
+                        <img id="profile-img" src="https://i.pravatar.cc/300" alt="Profile" class="w-full h-full object-cover">
+                        <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer admin-only" onclick="toggleEditProfileModal()">
+                            <i data-lucide="edit-3" class="text-white"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex-1 text-center md:text-left">
+                    <div class="flex items-center justify-center md:justify-start gap-3 mb-2">
+                        <h1 id="profile-name" class="text-4xl font-bold tracking-tight cursor-pointer admin-only" onclick="editInline('name')">John Doe</h1>
+                        <span id="client-badge" class="hidden px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-semibold border border-emerald-500/30">CLIENT MODE</span>
+                    </div>
+                    <p id="profile-bio" class="text-slate-400 max-w-md leading-relaxed admin-only" onclick="editInline('bio')">Digital Creator & Fullstack Developer crafting immersive web experiences.</p>
+                    
+                    <div class="flex flex-wrap items-center justify-center md:justify-start gap-4 mt-6">
+                        <div class="flex items-center gap-2 px-4 py-2 rounded-2xl glass text-sm font-medium">
+                            <i data-lucide="eye" class="w-4 h-4 text-indigo-400"></i>
+                            <span id="total-views">0</span> Views
+                        </div>
+                        <button onclick="toggleTheme()" class="p-3 rounded-2xl glass hover:bg-white/10 transition-colors">
+                            <i data-lucide="moon" id="theme-icon" class="w-5 h-5"></i>
+                        </button>
+                        <button onclick="toggleClientMode()" id="client-toggle" class="px-4 py-2 rounded-2xl glass hover:bg-white/10 transition-colors text-sm font-medium flex items-center gap-2">
+                            <i data-lucide="lock" class="w-4 h-4"></i>
+                            Admin Mode
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation Bar -->
+        <nav class="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 glass p-2 flex items-center gap-1 shadow-2xl scale-110">
+            <button onclick="navigate('home')" class="nav-item active px-6 py-2.5 rounded-2xl flex items-center gap-2 transition-all duration-300">
+                <i data-lucide="layout-grid" class="w-5 h-5"></i>
+                <span class="text-sm font-semibold">Home</span>
+            </button>
+            <button onclick="navigate('about')" class="nav-item px-6 py-2.5 rounded-2xl flex items-center gap-2 text-slate-400 transition-all duration-300">
+                <i data-lucide="user" class="w-5 h-5"></i>
+                <span class="text-sm font-semibold">About</span>
+            </button>
+            <button onclick="navigate('contact')" class="nav-item px-6 py-2.5 rounded-2xl flex items-center gap-2 text-slate-400 transition-all duration-300">
+                <i data-lucide="mail" class="w-5 h-5"></i>
+                <span class="text-sm font-semibold">Contact</span>
+            </button>
+        </nav>
+
+        <!-- Content Area -->
+        <main>
+            <!-- Page: Home -->
+            <section id="page-home" class="page active">
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
+                    <h2 class="text-2xl font-bold">Featured Projects</h2>
+                    <div class="flex items-center gap-3 w-full sm:w-auto">
+                        <div class="relative flex-1 sm:w-64">
+                            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500"></i>
+                            <input type="text" id="search-input" placeholder="Search project..." class="w-full pl-10 pr-4 py-2.5 rounded-2xl text-sm" oninput="handleSearch(this.value)">
+                        </div>
+                        <button onclick="openModal()" class="admin-only px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl transition-all flex items-center gap-2 text-sm font-bold shadow-lg shadow-indigo-600/20">
+                            <i data-lucide="plus" class="w-4 h-4"></i>
+                            Project
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Empty State -->
+                <div id="empty-state" class="hidden flex flex-col items-center justify-center py-20 glass border-dashed">
+                    <div class="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center mb-4">
+                        <i data-lucide="folder-plus" class="text-slate-500 w-8 h-8"></i>
+                    </div>
+                    <h3 class="text-lg font-bold">No projects found</h3>
+                    <p class="text-slate-400 text-sm">Start by adding your awesome work here.</p>
+                </div>
+
+                <!-- Project Grid -->
+                <div id="project-list" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Cards injected via JS -->
+                </div>
+            </section>
+
+            <!-- Page: About -->
+            <section id="page-about" class="page">
+                <div class="glass p-8 mb-6">
+                    <h2 class="text-2xl font-bold mb-4">About Me</h2>
+                    <p class="text-slate-400 leading-relaxed mb-8">
+                        I am a passionate designer and developer with a focus on creating smooth, high-performance web applications. My journey in the digital world began 5 years ago, and since then, I've had the pleasure of working with clients globally to bring their visions to life.
+                    </p>
+                    
+                    <h3 class="text-xl font-bold mb-6">Expertise</h3>
+                    <div class="space-y-6">
+                        <div class="skill-item">
+                            <div class="flex justify-between mb-2">
+                                <span class="text-sm font-semibold">UI/UX Design</span>
+                                <span class="text-sm font-bold text-indigo-400">95%</span>
+                            </div>
+                            <div class="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+                                <div class="skill-progress h-full bg-indigo-500 rounded-full w-[95%]"></div>
+                            </div>
+                        </div>
+                        <div class="skill-item">
+                            <div class="flex justify-between mb-2">
+                                <span class="text-sm font-semibold">Frontend Development</span>
+                                <span class="text-sm font-bold text-indigo-400">90%</span>
+                            </div>
+                            <div class="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+                                <div class="skill-progress h-full bg-indigo-500 rounded-full w-[90%]"></div>
+                            </div>
+                        </div>
+                        <div class="skill-item">
+                            <div class="flex justify-between mb-2">
+                                <span class="text-sm font-semibold">Backend Development</span>
+                                <span class="text-sm font-bold text-indigo-400">75%</span>
+                            </div>
+                            <div class="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+                                <div class="skill-progress h-full bg-indigo-500 rounded-full w-[75%]"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="admin-only glass p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div>
+                        <h4 class="font-bold">Database Management</h4>
+                        <p class="text-xs text-slate-400">Export or Import your portfolio data (JSON).</p>
+                    </div>
+                    <div class="flex gap-2 w-full sm:w-auto">
+                        <button onclick="exportData()" class="flex-1 sm:flex-none px-4 py-2 glass hover:bg-white/5 rounded-xl text-sm font-medium">Export</button>
+                        <button onclick="document.getElementById('import-file').click()" class="flex-1 sm:flex-none px-4 py-2 glass hover:bg-white/5 rounded-xl text-sm font-medium text-indigo-400">Import</button>
+                        <input type="file" id="import-file" class="hidden" accept=".json" onchange="importData(event)">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Page: Contact -->
+            <section id="page-contact" class="page">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="glass p-8">
+                        <h2 class="text-2xl font-bold mb-2">Say Hello!</h2>
+                        <p class="text-slate-400 text-sm mb-6">Feel free to reach out for collaborations or just a friendly chat.</p>
+                        
+                        <form onsubmit="return false" class="space-y-4">
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 uppercase ml-1">Name</label>
+                                <input type="text" placeholder="Your name" class="w-full px-4 py-3 rounded-2xl mt-1">
+                            </div>
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 uppercase ml-1">Email</label>
+                                <input type="email" placeholder="your@email.com" class="w-full px-4 py-3 rounded-2xl mt-1">
+                            </div>
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 uppercase ml-1">Message</label>
+                                <textarea rows="4" placeholder="Tell me something..." class="w-full px-4 py-3 rounded-2xl mt-1 resize-none"></textarea>
+                            </div>
+                            <button class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl transition-all shadow-lg shadow-indigo-600/30">
+                                Send Message
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="space-y-6">
+                        <div class="glass p-8">
+                            <h3 class="text-lg font-bold mb-4">Connect</h3>
+                            <div class="space-y-4">
+                                <a href="#" class="flex items-center justify-between p-4 rounded-2xl bg-white/5 hover:bg-white/10 transition-all group">
+                                    <div class="flex items-center gap-3">
+                                        <i data-lucide="github" class="w-5 h-5 text-slate-400 group-hover:text-white"></i>
+                                        <span class="font-medium">GitHub</span>
+                                    </div>
+                                    <i data-lucide="external-link" class="w-4 h-4 text-slate-600"></i>
+                                </a>
+                                <a href="#" class="flex items-center justify-between p-4 rounded-2xl bg-white/5 hover:bg-white/10 transition-all group">
+                                    <div class="flex items-center gap-3">
+                                        <i data-lucide="linkedin" class="w-5 h-5 text-slate-400 group-hover:text-white"></i>
+                                        <span class="font-medium">LinkedIn</span>
+                                    </div>
+                                    <i data-lucide="external-link" class="w-4 h-4 text-slate-600"></i>
+                                </a>
+                                <div onclick="copyText('hello@example.com')" class="flex items-center justify-between p-4 rounded-2xl bg-white/5 hover:bg-white/10 transition-all cursor-pointer group">
+                                    <div class="flex items-center gap-3">
+                                        <i data-lucide="at-sign" class="w-5 h-5 text-slate-400 group-hover:text-white"></i>
+                                        <span class="font-medium">Email</span>
+                                    </div>
+                                    <span class="text-xs text-indigo-400 font-bold opacity-0 group-hover:opacity-100">COPY</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="glass p-8 flex items-center gap-4 bg-indigo-500/10 border-indigo-500/20">
+                            <div class="w-12 h-12 bg-indigo-500 rounded-2xl flex items-center justify-center text-white">
+                                <i data-lucide="zap" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold">Available for hire</h4>
+                                <p class="text-xs text-slate-400">Open for full-time or freelance project.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <!-- Project Modal -->
+    <div id="project-modal" class="fixed inset-0 z-[100] hidden items-center justify-center p-6">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal()"></div>
+        <div class="glass w-full max-w-lg relative p-8 shadow-2xl scale-95 opacity-0 modal-content overflow-y-auto max-h-[90vh]">
+            <h2 id="modal-title" class="text-2xl font-bold mb-6">Add Project</h2>
+            <form id="project-form" onsubmit="saveProject(event)" class="space-y-5">
+                <input type="hidden" id="project-id">
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase">Project Name</label>
+                    <input type="text" id="p-name" required class="w-full px-4 py-3 rounded-2xl mt-1">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase">Description</label>
+                    <textarea id="p-desc" required rows="2" class="w-full px-4 py-3 rounded-2xl mt-1"></textarea>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase">Project Link</label>
+                    <input type="url" id="p-link" required class="w-full px-4 py-3 rounded-2xl mt-1" placeholder="https://example.com">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase">Thumbnail URL (Optional)</label>
+                    <input type="url" id="p-thumb" class="w-full px-4 py-3 rounded-2xl mt-1" oninput="previewThumb(this.value)">
+                </div>
+                
+                <div id="thumb-preview-box" class="h-40 rounded-2xl glass border-dashed flex items-center justify-center overflow-hidden">
+                    <span class="text-slate-500 text-xs">Thumbnail Preview</span>
+                </div>
+
+                <div class="flex gap-3 pt-4">
+                    <button type="button" onclick="closeModal()" class="flex-1 py-4 glass font-bold rounded-2xl">Cancel</button>
+                    <button type="submit" class="flex-1 py-4 bg-indigo-600 text-white font-bold rounded-2xl">Save Project</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Profile Modal -->
+    <div id="profile-modal" class="fixed inset-0 z-[100] hidden items-center justify-center p-6">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="toggleEditProfileModal()"></div>
+        <div class="glass w-full max-w-sm relative p-8 shadow-2xl modal-content">
+            <h2 class="text-xl font-bold mb-6">Edit Profile</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase">Profile Photo URL</label>
+                    <input type="url" id="profile-url-input" class="w-full px-4 py-3 rounded-2xl mt-1" placeholder="https://...">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase">Display Name</label>
+                    <input type="text" id="profile-name-input" class="w-full px-4 py-3 rounded-2xl mt-1">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase">Bio</label>
+                    <textarea id="profile-bio-input" class="w-full px-4 py-3 rounded-2xl mt-1"></textarea>
+                </div>
+                <button onclick="saveProfile()" class="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl">Update Profile</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed top-8 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2"></div>
+
+    <script>
+        // State Management
+        let state = {
+            projects: [],
+            profile: {
+                name: "John Doe",
+                bio: "Digital Creator & Fullstack Developer crafting immersive web experiences.",
+                photo: "https://i.pravatar.cc/300"
+            },
+            views: Math.floor(Math.random() * (10000 - 100) + 100),
+            isClientMode: false,
+            currentTheme: 'dark'
+        };
+
+        // Initialize App
+        window.onload = () => {
+            loadStorage();
+            initLucide();
+            renderProjects();
+            updateProfileUI();
+            
+            // Loader Animation
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += Math.random() * 30;
+                document.getElementById('loader-progress').style.width = progress + '%';
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    gsap.to("#loader", { opacity: 0, duration: 0.8, onComplete: () => {
+                        document.getElementById('loader').style.display = 'none';
+                        gsap.from("header", { y: -50, opacity: 0, duration: 1, ease: "power3.out" });
+                        gsap.from("#project-list", { opacity: 0, y: 50, duration: 1, delay: 0.2 });
+                    }});
+                }
+            }, 200);
+
+            initSortable();
+            detectTheme();
+        };
+
+        function initLucide() {
+            lucide.createIcons();
+        }
+
+        // --- Navigation ---
+        function navigate(pageId) {
+            playSound();
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => {
+                n.classList.remove('active', 'text-white');
+                n.classList.add('text-slate-400');
+            });
+
+            const targetPage = document.getElementById(`page-${pageId}`);
+            const targetNav = document.querySelector(`nav button[onclick="navigate('${pageId}')"]`);
+
+            targetPage.style.display = 'block';
+            targetNav.classList.add('active', 'text-white');
+            targetNav.classList.remove('text-slate-400');
+
+            gsap.fromTo(targetPage, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5 });
+            initLucide();
+        }
+
+        // --- Core Functions ---
+        function renderProjects(items = state.projects) {
+            const container = document.getElementById('project-list');
+            const emptyState = document.getElementById('empty-state');
+            
+            container.innerHTML = '';
+            
+            if (items.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            items.forEach((proj, index) => {
+                const thumb = proj.thumb || `https://api.microlink.io/?url=${encodeURIComponent(proj.link)}&screenshot=true&embed=screenshot.url`;
+                const fallback = `https://image.thum.io/get/width/800/${proj.link}`;
+                
+                const card = document.createElement('div');
+                card.className = 'glass-card rounded-3xl overflow-hidden group cursor-move';
+                card.setAttribute('data-id', proj.id);
+                card.innerHTML = `
+                    <div class="relative h-52 overflow-hidden skeleton">
+                        <img src="${thumb}" onerror="this.src='${fallback}'; this.onerror=function(){ this.src='https://via.placeholder.com/800x450/1e293b/6366f1?text=Preview+Unavailable'; this.parentElement.classList.remove('skeleton'); };" 
+                             onload="this.parentElement.classList.remove('skeleton')"
+                             class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110">
+                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                            <a href="${proj.link}" target="_blank" class="w-12 h-12 bg-white text-black rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-xl">
+                                <i data-lucide="external-link" class="w-5 h-5"></i>
+                            </a>
+                            <button onclick="editProject('${proj.id}')" class="admin-only w-12 h-12 bg-white/20 backdrop-blur-md text-white rounded-full flex items-center justify-center hover:scale-110 transition-transform border border-white/30">
+                                <i data-lucide="edit-2" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="font-bold text-lg">${proj.name}</h3>
+                            <div class="flex items-center gap-1 text-xs text-slate-500 font-bold">
+                                <i data-lucide="eye" class="w-3 h-3"></i>
+                                <span>${proj.views || 0}</span>
+                            </div>
+                        </div>
+                        <p class="text-slate-400 text-sm line-clamp-2 leading-relaxed mb-4">${proj.desc}</p>
+                        <div class="flex items-center justify-between">
+                            <button onclick="copyText('${proj.link}')" class="text-xs font-bold text-indigo-400 flex items-center gap-1 hover:text-indigo-300 transition-colors">
+                                <i data-lucide="copy" class="w-3 h-3"></i> COPY LINK
+                            </button>
+                            <button onclick="deleteProject('${proj.id}')" class="admin-only text-xs font-bold text-rose-500/50 hover:text-rose-500 transition-colors">DELETE</button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+            initLucide();
+            applyClientModeUI();
+        }
+
+        function saveProject(e) {
+            e.preventDefault();
+            playSound();
+            const id = document.getElementById('project-id').value || Date.now().toString();
+            const newProject = {
+                id,
+                name: document.getElementById('p-name').value,
+                desc: document.getElementById('p-desc').value,
+                link: document.getElementById('p-link').value,
+                thumb: document.getElementById('p-thumb').value,
+                views: state.projects.find(p => p.id === id)?.views || 0
+            };
+
+            const existingIndex = state.projects.findIndex(p => p.id === id);
+            if (existingIndex > -1) {
+                state.projects[existingIndex] = newProject;
+                showToast("Project updated successfully!");
+            } else {
+                state.projects.unshift(newProject);
+                showToast("New project added!");
+            }
+
+            saveStorage();
+            renderProjects();
+            closeModal();
+        }
+
+        function deleteProject(id) {
+            playSound();
+            if(confirm("Hapus project ini?")) {
+                state.projects = state.projects.filter(p => p.id !== id);
+                saveStorage();
+                renderProjects();
+                showToast("Project deleted", "warning");
+            }
+        }
+
+        function editProject(id) {
+            const proj = state.projects.find(p => p.id === id);
+            if (!proj) return;
+
+            document.getElementById('modal-title').innerText = "Edit Project";
+            document.getElementById('project-id').value = proj.id;
+            document.getElementById('p-name').value = proj.name;
+            document.getElementById('p-desc').value = proj.desc;
+            document.getElementById('p-link').value = proj.link;
+            document.getElementById('p-thumb').value = proj.thumb;
+            
+            previewThumb(proj.thumb);
+            openModal();
+        }
+
+        // --- UI Interactions ---
+        function openModal() {
+            const modal = document.getElementById('project-modal');
+            modal.style.display = 'flex';
+            gsap.to(modal.querySelector('.modal-content'), { scale: 1, opacity: 1, duration: 0.4, ease: "back.out(1.7)" });
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('project-modal');
+            gsap.to(modal.querySelector('.modal-content'), { scale: 0.9, opacity: 0, duration: 0.3, onComplete: () => {
+                modal.style.display = 'none';
+                document.getElementById('project-form').reset();
+                document.getElementById('project-id').value = '';
+                document.getElementById('modal-title').innerText = "Add Project";
+                document.getElementById('thumb-preview-box').innerHTML = '<span class="text-slate-500 text-xs">Thumbnail Preview</span>';
+            }});
+        }
+
+        function previewThumb(url) {
+            const box = document.getElementById('thumb-preview-box');
+            if (url) {
+                box.innerHTML = `<img src="${url}" class="w-full h-full object-cover">`;
+            } else {
+                box.innerHTML = '<span class="text-slate-500 text-xs">Thumbnail Preview</span>';
+            }
+        }
+
+        function toggleEditProfileModal() {
+            if (state.isClientMode) return;
+            const modal = document.getElementById('profile-modal');
+            const isHidden = modal.style.display === 'none' || modal.style.display === '';
+            
+            if(isHidden) {
+                document.getElementById('profile-url-input').value = state.profile.photo;
+                document.getElementById('profile-name-input').value = state.profile.name;
+                document.getElementById('profile-bio-input').value = state.profile.bio;
+                modal.style.display = 'flex';
+                gsap.fromTo(modal.querySelector('.modal-content'), { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1 });
+            } else {
+                modal.style.display = 'none';
+            }
+        }
+
+        function saveProfile() {
+            state.profile.photo = document.getElementById('profile-url-input').value;
+            state.profile.name = document.getElementById('profile-name-input').value;
+            state.profile.bio = document.getElementById('profile-bio-input').value;
+            
+            updateProfileUI();
+            saveStorage();
+            toggleEditProfileModal();
+            showToast("Profile updated!");
+        }
+
+        function updateProfileUI() {
+            document.getElementById('profile-img').src = state.profile.photo || 'https://i.pravatar.cc/300';
+            document.getElementById('profile-name').innerText = state.profile.name;
+            document.getElementById('profile-bio').innerText = state.profile.bio;
+            document.getElementById('total-views').innerText = state.views.toLocaleString();
+        }
+
+        // --- Features ---
+        function handleSearch(val) {
+            const filtered = state.projects.filter(p => 
+                p.name.toLowerCase().includes(val.toLowerCase()) || 
+                p.desc.toLowerCase().includes(val.toLowerCase())
+            );
+            renderProjects(filtered);
+        }
+
+        function toggleTheme() {
+            playSound();
+            const body = document.body;
+            state.currentTheme = state.currentTheme === 'dark' ? 'light' : 'dark';
+            
+            if (state.currentTheme === 'light') {
+                body.classList.add('light-mode');
+                body.setAttribute('data-theme', 'light');
+                document.getElementById('theme-icon').innerHTML = '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>';
+            } else {
+                body.classList.remove('light-mode');
+                body.setAttribute('data-theme', 'dark');
+                document.getElementById('theme-icon').innerHTML = '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path>';
+            }
+            initLucide();
+            saveStorage();
+        }
+
+        function detectTheme() {
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches && !localStorage.getItem('portfolio_state')) {
+                toggleTheme();
+            }
+        }
+
+        function toggleClientMode() {
+            playSound();
+            state.isClientMode = !state.isClientMode;
+            applyClientModeUI();
+            showToast(state.isClientMode ? "Client Mode Active (Read Only)" : "Admin Mode Active", "info");
+        }
+
+        function applyClientModeUI() {
+            const adminElements = document.querySelectorAll('.admin-only');
+            const clientBadge = document.getElementById('client-badge');
+            const toggleBtn = document.getElementById('client-toggle');
+
+            if (state.isClientMode) {
+                adminElements.forEach(el => el.classList.add('hidden-admin'));
+                clientBadge.classList.remove('hidden');
+                toggleBtn.innerHTML = '<i data-lucide="unlock" class="w-4 h-4"></i> Admin Mode';
+            } else {
+                adminElements.forEach(el => el.classList.remove('hidden-admin'));
+                clientBadge.classList.add('hidden');
+                toggleBtn.innerHTML = '<i data-lucide="lock" class="w-4 h-4"></i> Client Mode';
+            }
+            initLucide();
+        }
+
+        // --- Storage & Data ---
+        function saveStorage() {
+            localStorage.setItem('portfolio_state', JSON.stringify(state));
+        }
+
+        function loadStorage() {
+            const data = localStorage.getItem('portfolio_state');
+            if (data) {
+                state = JSON.parse(data);
+                // Increment view on reload (fake)
+                state.views += 1;
+                saveStorage();
+            }
+        }
+
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "portfolio_backup.json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+            showToast("Data exported successfully!");
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importedState = JSON.parse(e.target.result);
+                    state = importedState;
+                    saveStorage();
+                    location.reload();
+                } catch (err) {
+                    showToast("Invalid JSON file", "error");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // --- Utilities ---
+        function showToast(msg, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const colors = {
+                success: 'bg-emerald-500',
+                warning: 'bg-amber-500',
+                error: 'bg-rose-500',
+                info: 'bg-indigo-500'
+            };
+            
+            toast.className = `${colors[type]} text-white px-6 py-3 rounded-2xl shadow-xl font-bold text-sm mb-2 opacity-0 translate-y-[-20px] transition-all duration-300`;
+            toast.innerText = msg;
+            
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.remove('opacity-0', 'translate-y-[-20px]');
+                toast.classList.add('opacity-100', 'translate-y-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-[-20px]');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function playSound() {
+            const snd = document.getElementById('click-sound');
+            snd.currentTime = 0;
+            snd.volume = 0.2;
+            snd.play().catch(() => {}); // Catch browser policy block
+        }
+
+        function copyText(text) {
+            playSound();
+            const el = document.createElement('textarea');
+            el.value = text;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            showToast("Copied to clipboard!");
+        }
+
+        function initSortable() {
+            const el = document.getElementById('project-list');
+            Sortable.create(el, {
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                dragClass: 'sortable-drag',
+                disabled: state.isClientMode,
+                onEnd: () => {
+                    if (state.isClientMode) return;
+                    const newOrder = [];
+                    el.querySelectorAll('.glass-card').forEach(card => {
+                        const id = card.getAttribute('data-id');
+                        const proj = state.projects.find(p => p.id === id);
+                        if (proj) newOrder.push(proj);
+                    });
+                    state.projects = newOrder;
+                    saveStorage();
+                    showToast("Order saved");
+                }
+            });
+        }
+    </script>
+</body>
+</html>
+
